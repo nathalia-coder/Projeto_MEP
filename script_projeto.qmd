@@ -2,15 +2,15 @@
 title: "Projeto Final"
 subtitle: "Disciplina Métodos Estatísticos de Previsão"
 author: 
-  - "Isabela"
-  - "Nathalia"
+  - name: "Isabela"
+  - name: "Nathalia Gabriella Ferreira dos Santos"
 date: "11/29/2023"
 format:
   pdf:
     toc: true
     number-sections: true
     documentclass: report
-    fig-cap-location: top
+    fig-cap-location: bottom
     geometry:
       - top=3cm
       - left=3cm
@@ -75,7 +75,7 @@ serie_test <- ts(df_test$Passageiros, start=1960, frequency=12)
 ```{r grafico_serie}
 #| label: fig-serie
 #| fig-cap: "Gráfico da série"
-plot(serie_train, main = "Gráfico da série")
+plot(serie_train, ylab="Série", xlab="Tempo", main = "Gráfico da série")
 ```
 
 A @fig-serie indica o comportamento dos dados ao longo do tempo. Nota-se *comportamento crescente* além de presença de grandes picos de *sazonalidade*, a qual parece se comportar como um modelo em que a sazonalidade seja aditiva e/ou multiplicativa, ou seja, a sazonalidade muda ao longo do tempo, esse caso será melhor avaliado na @sec-alisamento.
@@ -103,39 +103,60 @@ As constantes de suavização encontradadas são:
 | $\gamma$  | `r fit_adit$gamma %>% round(4)` | `r fit_mult$gamma %>% round(4)` |
 : Constantes para ambos modelos
 
-```{r}
+A partir das constantes encontradas, sobre os modelos, nota-se que:
+
+- o $\alpha$ associado ao nível é maior no modelo multiplicativo. Ou seja, o modelo multiplicativo coloca cerca de `r round(fit_mult$alpha/fit_adit$alpha)[[1]]` mais peso na influência das informações mais recentes sobre o nível do que o modelo aditivo. 
+
+- Em contrapartida, o $\beta$ associado a tendência é `r round(fit_adit$beta/fit_mult$beta)[[1]]` vezes maior no modelo aditivo, o que implica que o modelo aditivo coloca mais peso na influência das informações mais recentes sobre a tendência. 
+
+- Por fim, ambos colocam pesos iguais ao $\gamma$ associado a sazonalidade. Como o peso é 1, indica que toda sazonalida pode ser explicada pelas informações recentes. 
+
+```{r erros_previsao}
 EQMP_A <- fit_adit$SSE
 EQMP_M <- fit_mult$SSE
 ```
 
-Além disso, foi calculado o Erro Quadrático Médio de Previsão para ambos ajuste, como $EQMP_{Aditivo} =$`r EQMP_A` < `r EQMP_M` $= EQMP_{Multiplicativo}$, o modelo aditivo deve ser preferível para modelar a série. Entretanto, ambos serão usados para testar a previsão para esse caso de Alisamento Exponencial.
+Além disso, foi calculado o Erro Quadrático Médio de Previsão para ambos ajuste, como:
 
-# Comparação de modelos
+$EQMP_{Aditivo} =$`r EQMP_A` < `r EQMP_M` $= EQMP_{Multiplicativo}$, 
+
+o modelo aditivo deve ser preferível para modelar a série, logo, ele será usado para previsão a ser feita na @sec-comparacao.
+
+# Comparação de modelos {#sec-comparacao}
+
+## Previsão usando ARIMA
+
+## Previsão usando Alisamento Exponencial
+
+Os valores preditos usando o modelo final obtido na @sec-alisamento estão contidos na @tbl-previsao-alisamento, uma coluna foi adicionada indicando se o Intervalo de Confiança contém ou não o valor real da série. Nesse caso, apenas para o 3º mês foi observado que o valor real não estava contido no intervalo.
 
 ```{r previsao_alisamento}
+#| label: tbl-previsao-alisamento
+#| tbl-cap: Previsão AEWH-Aditivo
 previsao_adit = predict(fit_adit, n.ahead=12, prediction.interval = TRUE, level = 0.95, interval="prediction")
-previsao_mult = predict(fit_mult, n.ahead=12, prediction.interval = TRUE, level = 0.95, interval="prediction")
 
 df_prev_adit <- previsao_adit %>% as_tibble()
-df_prev_mult <- previsao_mult %>% as_tibble()
 
 previsoes <- serie_test %>% as_tibble() %>% rename(real = x) %>% 
   mutate(
-    fitA = df_prev_adit$fit, lwrA = df_prev_adit$lwr, uprA = df_prev_adit$upr,
-    fitM = df_prev_mult$fit, lwrM = df_prev_mult$lwr, uprM = df_prev_mult$upr 
+    fit = df_prev_adit$fit, lwr = df_prev_adit$lwr, upr = df_prev_adit$upr
     ) %>% round()
 
 previsoes %>% mutate(
-  ICA = ifelse((real < uprA) & (real > lwrA), "Está no IC de A", "Não está no IC de A"),
-  ICB = ifelse((real < uprM) & (real > lwrM), "Está no IC de M", "Não está no IC de M")
+  ConclusaoIC = ifelse((real < upr) & (real > lwr), "Contém ajuste", "Não contém ajuste")
 ) 
 ```
 
-A figura indica as previsões feitas para ambos 
+Além disso, a @fig-previsao-alisamento indica o comportamento das previsões feitas junto a série usada para treino. Nota-se que os intervalos estão bem próximos do valor ajustado, o que indica que com mais certeza (menor variabilade) o modelo consegue predizer o valor real.
 
-```{r}
-plot(fit_adit, previsao_adit, lwd=2, col="black", xlab="Ano", ylab=NA)
-plot(fit_mult, previsao_mult, lwd=2, col="black", xlab="Ano", ylab=NA)
+```{r grafico_prev_alisamento}
+#| label: fig-previsao-alisamento
+#| fig-cap: Valores preditos para modelo AEWH-Aditivo
+#| fig-width: 9
+#| fig-height: 6
+plot(fit_adit, previsao_adit, lwd=2, col="black", xlab="Tempo", ylab=NA)
 ```
 
-Sobre as previsões mostradas
+# Conclusão
+
+Dado o discutido nesse trabalho, pelo observado das previsões obtidas na @sec-comparacao, conclui-se que o modelo que resultou nas melhores previsões e portanto entende-se ser o melhor, foi ....
