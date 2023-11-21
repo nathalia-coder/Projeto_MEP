@@ -1,0 +1,141 @@
+---
+title: "Projeto Final"
+subtitle: "Disciplina Métodos Estatísticos de Previsão"
+author: 
+  - "Isabela"
+  - "Nathalia"
+date: "11/29/2023"
+format:
+  pdf:
+    toc: true
+    number-sections: true
+    documentclass: report
+    fig-cap-location: top
+    geometry:
+      - top=3cm
+      - left=3cm
+      - right=2cm
+      - bottom=2cm
+    df-print: kable
+editor: visual
+lang: pt
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r config_inicial, echo=FALSE}
+# opcao global 
+knitr::opts_chunk$set(
+  echo = FALSE, # tirando o codigo das saidas
+  cache = FALSE,
+  warning = FALSE,
+  message = FALSE
+  )
+```
+
+# Descrição dos Dados
+
+```{r bibliotecas}
+library(tidyverse)
+```
+
+```{r carregamento_dados}
+rm(list = ls())
+
+df <- read.csv("AirPassengers.csv") %>%
+  as_tibble()
+```
+
+A série escolhida para realizar o trabalho foi obtida por meio da plataforma kaggle no seguinte [link](https://www.kaggle.com/datasets/ashfakyeafi/air-passenger-data-for-time-series-analysis/data). O banco de dados é sobre o **número mensal de passageiros de voos aéreos do ano de 1949 a 1960**, ao todo contém `r nrow(df)` observações. A tabela
+
+```{r descricao_inicial}
+#| label: tbl-descricao_inicial
+#| tbl-cap: "Resumo das 5 primeiras observações do conjunto de dados"
+
+df <- df %>% 
+  rename(
+    Mes = Month,
+    Passageiros = X.Passengers)
+
+df %>% head()
+```
+
+Como o foco do projeto é realizar previsões, optou-se por retirar as 12 observações finais do conjunto de dados. Ou seja, `r nrow(df)-12` observações serão usadas para *treino* dos modelos de previsão para séries temporais e depois será comparado quão bem cada modelo usado realizou as previsões.
+
+```{r split_train_test}
+H=12	# Numero de previsoes
+n=nrow(df)-H # Coloca em n o tamanho da serie menos H observacoes 
+df_train = df[1:n,] # Serie reduzida
+df_test = df[(n+1):(n+H),] # Serie reduzida
+
+serie_train <- ts(df_train$Passageiros, start=1949, frequency=12)
+serie_test <- ts(df_test$Passageiros, start=1960, frequency=12)
+```
+
+```{r grafico_serie}
+#| label: fig-serie
+#| fig-cap: "Gráfico da série"
+plot(serie_train, main = "Gráfico da série")
+```
+
+A @fig-serie indica o comportamento dos dados ao longo do tempo. Nota-se *comportamento crescente* além de presença de grandes picos de *sazonalidade*, a qual parece se comportar como um modelo em que a sazonalidade seja aditiva e/ou multiplicativa, ou seja, a sazonalidade muda ao longo do tempo, esse caso será melhor avaliado na @sec-alisamento.
+
+# Ajustes de Modelos
+
+## Modelo ARIMA
+
+## Modelo de Alisamento Exponencial {#sec-alisamento}
+
+Como observado na @fig-serie, devido a presença de sazonalidade aaditiva e/ou multiplicativa, os modelo de **Alisamento Exponencial de HOLT-WINTERS** aditivo e com fator multiplicativo foram considerados a fim de avaliar o Erro Quadrático Médio de Previsão para ambos ajustes e escolher o melhor.
+
+```{r ajuste_multiplicativo}
+fit_adit <- HoltWinters(serie_train, alpha = NULL, beta = NULL, gamma = NULL, seasonal = c("additive"))
+
+fit_mult <- HoltWinters(serie_train, alpha = NULL, beta = NULL, gamma = NULL, seasonal = c("multiplicative"))
+```
+
+As constantes de suavização encontradadas são:
+
+| Constante | Modelo Aditivo             | Modelo Multiplicativo             |
+|-----------|----------------------------|----------------------------|
+| $\alpha$  | `r fit_adit$alpha %>% round(4)` | `r fit_mult$alpha %>% round(4)` |
+| $\beta$   | `r fit_adit$beta %>% round(4)`  | `r fit_mult$beta %>% round(4)`  |
+| $\gamma$  | `r fit_adit$gamma %>% round(4)` | `r fit_mult$gamma %>% round(4)` |
+: Constantes para ambos modelos
+
+```{r}
+EQMP_A <- fit_adit$SSE
+EQMP_M <- fit_mult$SSE
+```
+
+Além disso, foi calculado o Erro Quadrático Médio de Previsão para ambos ajuste, como $EQMP_{Aditivo} =$`r EQMP_A` < `r EQMP_M` $= EQMP_{Multiplicativo}$, o modelo aditivo deve ser preferível para modelar a série. Entretanto, ambos serão usados para testar a previsão para esse caso de Alisamento Exponencial.
+
+# Comparação de modelos
+
+```{r previsao_alisamento}
+previsao_adit = predict(fit_adit, n.ahead=12, prediction.interval = TRUE, level = 0.95, interval="prediction")
+previsao_mult = predict(fit_mult, n.ahead=12, prediction.interval = TRUE, level = 0.95, interval="prediction")
+
+df_prev_adit <- previsao_adit %>% as_tibble()
+df_prev_mult <- previsao_mult %>% as_tibble()
+
+previsoes <- serie_test %>% as_tibble() %>% rename(real = x) %>% 
+  mutate(
+    fitA = df_prev_adit$fit, lwrA = df_prev_adit$lwr, uprA = df_prev_adit$upr,
+    fitM = df_prev_mult$fit, lwrM = df_prev_mult$lwr, uprM = df_prev_mult$upr 
+    ) %>% round()
+
+previsoes %>% mutate(
+  ICA = ifelse((real < uprA) & (real > lwrA), "Está no IC de A", "Não está no IC de A"),
+  ICB = ifelse((real < uprM) & (real > lwrM), "Está no IC de M", "Não está no IC de M")
+) 
+```
+
+A figura indica as previsões feitas para ambos 
+
+```{r}
+plot(fit_adit, previsao_adit, lwd=2, col="black", xlab="Ano", ylab=NA)
+plot(fit_mult, previsao_mult, lwd=2, col="black", xlab="Ano", ylab=NA)
+```
+
+Sobre as previsões mostradas
