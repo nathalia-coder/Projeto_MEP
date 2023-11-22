@@ -2,7 +2,7 @@
 title: "Projeto Final"
 subtitle: "Disciplina Métodos Estatísticos de Previsão"
 author: 
-  - name: "Isabela"
+  - name: "Isabela Ferreira Ventura Cruz"
   - name: "Nathalia Gabriella Ferreira dos Santos"
 date: "11/29/2023"
 format:
@@ -37,6 +37,10 @@ knitr::opts_chunk$set(
 
 ```{r bibliotecas}
 library(tidyverse)
+library(lmtest)
+library(forecast)
+library(tseries)
+library(tseries)
 ```
 
 ```{r carregamento_dados}
@@ -68,6 +72,7 @@ n=nrow(df)-H # Coloca em n o tamanho da serie menos H observacoes
 df_train = df[1:n,] # Serie reduzida
 df_test = df[(n+1):(n+H),] # Serie reduzida
 
+serie <- ts(df$Passageiros, start=1949, frequency = 12)
 serie_train <- ts(df_train$Passageiros, start=1949, frequency=12)
 serie_test <- ts(df_test$Passageiros, start=1960, frequency=12)
 ```
@@ -82,7 +87,125 @@ A @fig-serie indica o comportamento dos dados ao longo do tempo. Nota-se *compor
 
 # Ajustes de Modelos
 
-## Modelo ARIMA
+## Modelo ARIMA {#sec-arima}
+
+### **Estacionariedade**
+
+Os modelos ARIMA de Box e Jenkins partem do pré suposto de que a série é estacionária, desse modo, o primeiro passo para uma modelagem acertiva é verificar a estacionariedade da série. Para isso foi utilizado o teste de Dickey-Fuller, em que a hipótese nula é que os dados não são estacionários, o valor-p do teste é 0,01, ou seja, rejeitamos essa hipótese e não precisaremos tomar diferenças na série (d=0).
+
+```{r teste_estacionariedade}
+est_arima <- adf.test(serie_train)
+```
+
+### Identificação do modelo
+
+Para identificar o modelo foram analisados os gráficos de autocorrelação (ACF) e autocorrelação parcial (PACF). Em @fig-acf podemos notar que há um decaimento rápido e picos significativos nos lags multiplos de 12, esse é um forte indicativo de sazonalidade (S =12). Já em @fig-pacf podemos notar um pico significativo no lag 1, e picos significativos nos lags 8 e 10 e 12. Como a significância adotada neste trabalho é de 5%, esperamos que 5% dos valores de $\Phi_{kk}$ estejam fora dos limites esperados, desse modo, consideraremos apenas os lags 1, e 12 significativos. Desse modo, o pico no lag 12 é mais um indício de sazonalidade de ordem 12. Juntando as informações trazidas pelos gráficos da ACF e da PACF, iniciamos a análise partindo de um modelo SARIMA(1,0,0)(0,0,1) e o sobrefixamos, aumentando a ordem dos componentes um por um.
+
+```{r acf}
+#| label: fig-acf
+#| fig-cap: "ACF"
+acf(serie_train, lag.max=60)
+```
+
+```{r pacf}
+#| label: fig-pacf
+#| fig-cap: "PACF"
+pacf(serie_train)
+```
+
+#### **Modelo inicial:**
+
+O modelo inicial é um SARIMA(1,0,0)(0,0,1)12. Todos os coeficientes são significativos e o AIC é 1187.266
+
+```{r modelo_inicial_sarima}
+mod1 <- arima(serie_train,  c(1,0,0), seasonal = c(0,0,1))
+#coeftest(mod1) # Todos os coeficientes são significativos
+#mod1$aic # 1187.266
+```
+
+#### **Modelo 02**
+
+Aumentando a ordem p chegamos a um modelo SARIMA(2,0,0)(0,0,1)12. Todos os coeficientes são significativos e o AIC (1181.575) caiu
+
+```{r modelo_sarima_02}
+mod2 <- arima(serie_train,  c(2,0,0), seasonal = c(0,0,1))
+#coeftest(mod2) # Todos os coeficientes são significativos
+#mod2$aic # 1181.575, caiu pouco em relação ao anterior
+```
+
+### **Modelo 03**
+
+Aumentando a ordem p novamente chegamos a um SARIMA(3,0,0)(0,0,1)12. Nem todos os coeficientes são significativos e o AIC (1182.402) aumentou em relação ao modelo 02. Desse modo, ficamos com p = 2 e o melhor modelo até então é o modelo 02.
+
+```{r modelo_sarima_03}
+mod3 <- arima(serie_train,  c(3,0,0), seasonal = c(0,0,1))
+#coeftest(mod3) # Nem todos os coeficientes são significativos
+#mod3$aic # 1182.402, aic aumentou
+```
+
+### **Modelo 04**
+
+Aumentando a ordem q temos um modelo SARIMA(2,0,1)(0,0,1)12. Todos os coeficientes são significativos e o AIC (1177.668) caiu
+
+```{r modelo_sarima_04}
+mod4 <- arima(serie_train,  c(2,0,1), seasonal = c(0,0,1))
+#coeftest(mod4) # Todos os coeficientes são significativos
+#mod4$aic # 1177.668
+```
+
+### **Modelo 05**
+
+Aumentando a ordem q chegamos a um SARIMA(2,0,2)(0,0,1)12. Nem todos os coeficientes são significativos e o AIC (1184.598) aumentou. Desse modo, ficamos com q=1 e o melhor modelo até então é o modelo 04
+
+```{r modelo_sarima_05}
+mod5 <- arima(serie_train,  c(2,0,2), seasonal = c(0,0,1))
+#coeftest(mod5) # Coeficientes ar2, ma1 e ma2 não significativos
+#mod5$aic # 1184.598, o aic aumentou
+```
+
+### **Modelo 06**
+
+Aumentando a ordem P: SARIMA(2,0,1)(1,0,1)12. O ajuste não convergiu. Desse modo, ficamos com P=0
+
+```{r modelo_sarima_06}
+#mod6 <- arima(serie_train,  c(2,0,1), seasonal = c(1,0,1)) # Ajuste não convergiu
+```
+
+### **Modelo 07**
+
+Aumentando a ordem Q chegamos a um SARIMA(2,0,1)(0,0,2)12. Nem todos os coeficientes são significativos mas o AIC (1137.312) caiu.
+
+```{r modelo_sarima_07}
+mod7 <- arima(serie_train,  c(2,0,1), seasonal = c(0,0,2))
+#coeftest(mod7) # Coeficientes ar1, ar2 e ma1 não significativos
+#mod7$aic # 1137.312
+```
+
+### **Modelo 08**
+
+Aumentando a ordem Q temos um SARIMA(2,0,1)(0,0,3)12. Nem todos os coeficientes são significativos mas o AIC caiu. A partir daqui os modelos começam a ficar cada vez mais complicados e de convergência mais lenta, desse modo, paramos com Q=3
+
+```{r modelo_sarima_08}
+mod8 <- arima(serie_train,  c(2,0,1), seasonal = c(0,0,3))
+#coeftest(mod8) # Coeficiente ar1 não significativo
+#mod8$aic # 1096.508, o aic diminuiu
+
+```
+
+|     |         Modelo         | Número de coeficientes | Porcentagem de coeficientes significativos |          AIC           |
+|:------------:|:--------------:|:------------:|:------------:|:------------:|
+| 01  | SARIMA(1,0,0)(0,0,1)12 |           3            |                   100 %                    | `r round(mod1$aic, 4)` |
+| 02  | SARIMA(2,0,0)(0,0,1)12 |           4            |                   100 %                    | `r round(mod2$aic, 3)` |
+| 03  | SARIMA(3,0,0)(0,0,1)12 |           5            |                    80 %                    | `r round(mod3$aic, 3)` |
+| 04  | SARIMA(2,0,1)(0,0,1)12 |           5            |                   100 %                    | `r round(mod4$aic, 3)` |
+| 05  | SARIMA(2,0,2)(0,0,1)12 |           6            |                    50 %                    | `r round(mod5$aic, 3)` |
+| 06  | SARIMA(2,0,1)(1,0,1)12 |           \-           |                     \-                     |           \-           |
+| 07  | SARIMA(2,0,1)(0,0,2)12 |           6            |                    50 %                    | `r round(mod7$aic, 3)` |
+| 08  | SARIMA(2,0,1)(0,0,3)12 |           7            |                    86 %                    | `r round(mod8$aic, 3)` |
+
+: Modelos SARIMA ajustados
+
+Comparando todos os modelos acima, escolhemos o melhor considerando o menor AIC e maior número de coeficientes significativos. Os modelo com menor AIC é o 08 com 6 coeficientes significativos em 7, o modelo com segundo menor AIC é o modelo 07 e possui apenas metade dos coeficientes significativos, já o modelo 04 possui todos os coeficientes significativos mas AIC elevado se comparado com os modelos 07 e 08. Diante disso, optamos por escolher o modelo 08, pois apenas um coeficiente não é significativo e o AIC é menor dentre todas as opções abordadas.
 
 ## Modelo de Alisamento Exponencial {#sec-alisamento}
 
@@ -96,20 +219,21 @@ fit_mult <- HoltWinters(serie_train, alpha = NULL, beta = NULL, gamma = NULL, se
 
 As constantes de suavização encontradadas são:
 
-| Constante | Modelo Aditivo             | Modelo Multiplicativo             |
-|-----------|----------------------------|----------------------------|
+| Constante | Modelo Aditivo                  | Modelo Multiplicativo           |
+|------------------|---------------------------|---------------------------|
 | $\alpha$  | `r fit_adit$alpha %>% round(4)` | `r fit_mult$alpha %>% round(4)` |
 | $\beta$   | `r fit_adit$beta %>% round(4)`  | `r fit_mult$beta %>% round(4)`  |
 | $\gamma$  | `r fit_adit$gamma %>% round(4)` | `r fit_mult$gamma %>% round(4)` |
+
 : Constantes para ambos modelos
 
 A partir das constantes encontradas, sobre os modelos, nota-se que:
 
-- o $\alpha$ associado ao nível é maior no modelo multiplicativo. Ou seja, o modelo multiplicativo coloca cerca de `r round(fit_mult$alpha/fit_adit$alpha)[[1]]` mais peso na influência das informações mais recentes sobre o nível do que o modelo aditivo. 
+-   o $\alpha$ associado ao nível é maior no modelo multiplicativo. Ou seja, o modelo multiplicativo coloca cerca de `r round(fit_mult$alpha/fit_adit$alpha)[[1]]` mais peso na influência das informações mais recentes sobre o nível do que o modelo aditivo.
 
-- Em contrapartida, o $\beta$ associado a tendência é `r round(fit_adit$beta/fit_mult$beta)[[1]]` vezes maior no modelo aditivo, o que implica que o modelo aditivo coloca mais peso na influência das informações mais recentes sobre a tendência. 
+-   Em contrapartida, o $\beta$ associado a tendência é `r round(fit_adit$beta/fit_mult$beta)[[1]]` vezes maior no modelo aditivo, o que implica que o modelo aditivo coloca mais peso na influência das informações mais recentes sobre a tendência.
 
-- Por fim, ambos colocam pesos iguais ao $\gamma$ associado a sazonalidade. Como o peso é 1, indica que toda sazonalida pode ser explicada pelas informações recentes. 
+-   Por fim, ambos colocam pesos iguais ao $\gamma$ associado a sazonalidade. Como o peso é 1, indica que toda sazonalida pode ser explicada pelas informações recentes.
 
 ```{r erros_previsao}
 EQMP_A <- fit_adit$SSE
@@ -118,13 +242,49 @@ EQMP_M <- fit_mult$SSE
 
 Além disso, foi calculado o Erro Quadrático Médio de Previsão para ambos ajuste, como:
 
-$EQMP_{Aditivo} =$`r EQMP_A` < `r EQMP_M` $= EQMP_{Multiplicativo}$, 
+$EQMP_{Aditivo} =$`r EQMP_A` \< `r EQMP_M` $= EQMP_{Multiplicativo}$,
 
 o modelo aditivo deve ser preferível para modelar a série, logo, ele será usado para previsão a ser feita na @sec-comparacao.
 
 # Comparação de modelos {#sec-comparacao}
 
 ## Previsão usando ARIMA
+
+Os valores preditos usando o modelo final obtido na @sec-arima estão contidos na @tbl-previsao-arima , uma coluna foi adicionada indicando se o Intervalo de Confiança contém ou não o valor real da série. Nesse caso, apenas para o 7º mês foi observado que o valor real não estava contido no intervalo.
+
+```{r previsao_arima}
+#| label: tbl-previsao-arima
+#| tbl-cap: Previsão modelo SARIMA(2,0,1)(0,0,1)12
+
+previsao_arima <- forecast(mod8, 12, level = 95)
+
+df_prev_arima <- previsao_arima %>% as_tibble()
+
+previsoes_arima <- serie_test %>% as_tibble() %>% rename(real = x) %>% 
+  mutate(
+    fit = df_prev_arima$`Point Forecast`, lwr = df_prev_arima$`Lo 95`, upr = df_prev_arima$`Hi 95`
+    ) %>% round()
+
+previsoes_arima %>% mutate(
+  ConclusaoIC = ifelse((real < upr) & (real > lwr), "Contém ajuste", "Não contém ajuste")
+) 
+
+
+```
+
+Além disso, a @fig-previsao-arima indica o comportamento das previsões feitas junto a série usada para treino. Nota-se que os intervalos estão mais próximos do valor ajustado, o que indica que com mais certeza (menor variabilidade) o modelo consegue predizer o valor real.
+
+```{r grafico_prev_arima}
+#| label: fig-previsao-arima
+#| fig-cap: Valores preditos para o modelo SARIMA(2,0,1)(0,0,1)12
+#| fig-width: 9
+#| fig-height: 6
+#| 
+plot(serie_train, xlim=c(1949,1961), ylim=c(0, 600))
+lines(previsao_arima$lower, col="red")
+lines(previsao_arima$upper, col="red")
+lines(previsao_arima$mean, col="blue")
+```
 
 ## Previsão usando Alisamento Exponencial
 
@@ -147,7 +307,7 @@ previsoes %>% mutate(
 ) 
 ```
 
-Além disso, a @fig-previsao-alisamento indica o comportamento das previsões feitas junto a série usada para treino. Nota-se que os intervalos estão bem próximos do valor ajustado, o que indica que com mais certeza (menor variabilade) o modelo consegue predizer o valor real.
+Além disso, a @fig-previsao-alisamento indica o comportamento das previsões feitas junto a série usada para treino. Nota-se que os intervalos estão bem próximos do valor ajustado, o que indica que com mais certeza (menor variabilidade) o modelo consegue predizer o valor real.
 
 ```{r grafico_prev_alisamento}
 #| label: fig-previsao-alisamento
