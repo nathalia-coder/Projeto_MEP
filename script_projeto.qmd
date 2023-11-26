@@ -103,13 +103,13 @@ Para identificar o modelo foram analisados os gráficos de autocorrelação (ACF
 ```{r acf}
 #| label: fig-acf
 #| fig-cap: "ACF"
-acf(serie_train, lag.max=60)
+acf(serie_train, main = "ACF", lag.max=60)
 ```
 
 ```{r pacf}
 #| label: fig-pacf
 #| fig-cap: "PACF"
-pacf(serie_train)
+pacf(serie_train, main="PACF")
 ```
 
 ### **Modelo inicial:**
@@ -119,7 +119,7 @@ O modelo inicial é um $SARIMA(1,0,0)(0,0,1)_{12}$. Todos os coeficientes são s
 ```{r modelo_inicial_sarima}
 mod1 <- arima(serie_train,  c(1,0,0), seasonal = c(0,0,1))
 coeftest(mod1) # Todos os coeficientes são significativos
-#mod1$aic # 1187.266
+mod1$aic # 1187.266
 ```
 
 ### **Modelo 02**
@@ -191,7 +191,7 @@ mod8 <- arima(serie_train,  c(2,0,1), seasonal = c(0,0,3))
 ```
 
 |     |         Modelo         | Número de coeficientes | Porcentagem de coeficientes significativos |          AIC           |
-|:-----------:|:-----------:|:-----------:|:-------------------:|:-----------:|
+|:------------:|:------------:|:------------:|:---------------:|:------------:|
 | 01  | SARIMA(1,0,0)(0,0,1)12 |           3            |                   100 %                    | `r round(mod1$aic, 3)` |
 | 02  | SARIMA(2,0,0)(0,0,1)12 |           4            |                   100 %                    | `r round(mod2$aic, 3)` |
 | 03  | SARIMA(3,0,0)(0,0,1)12 |           5            |                    80 %                    | `r round(mod3$aic, 3)` |
@@ -205,29 +205,30 @@ mod8 <- arima(serie_train,  c(2,0,1), seasonal = c(0,0,3))
 
 Comparando todos os modelos acima, escolhemos o melhor considerando o menor AIC e maior número de coeficientes significativos. Os modelo com menor AIC é o 08 com 6 coeficientes significativos em 7, o modelo com segundo menor AIC é o modelo 07 e possui apenas metade dos coeficientes significativos, já o modelo 04 possui todos os coeficientes significativos mas AIC elevado se comparado com os modelos 07 e 08. Diante disso, optamos por escolher o modelo 08, pois apenas um coeficiente não é significativo e o AIC é menor dentre todas as opções abordadas.
 
-### **Modelo 09**
+### Análise de resíduos
 
-```{r modelo_sarima_09}
-mod9 <- arima(serie_train,  c(2,1,1), seasonal = c(0,1,1))
-coeftest(mod9) # tudo não significativo
-mod9$aic 
+#### Resíduos são ruído branco
+
+Uma das suposições dos modelos de Box e Jenkins é a que os resíduos são um ruído branco, isso pode ser verificado por meio do histograma em @fig-hist-residuos e do teste formal de shapiro-wilk.
+
+```{r normalidade_residuos_mod08}
+#| label: fig-hist-residuos
+#| fig-cap: "PACF dos resíduos"
+
+hist(mod8$residuals, main="Histograma dos resíduos", xlab = "Resíduos", ylab="Frequência")
+shapiro.test(mod8$residuals)
 ```
 
-Garante menor AIC e ruído brando nos resíduos
+#### Independência
 
-```{r}
-acf(mod9$residuals)
-pacf(mod9$residuals)
-shapiro.test(mod9$residuals)
-Box.test(mod9$residuals, lag = 12)
-```
+A suposição de independência dos resíduos pode ser verficada por meio dos gráficos de ACF e PACF dos resíduos, bem como o teste formal de Ljung-Box cuja hipótese nula é H0: Não há autocorrelação nos resíduos. Apesar dos gráficos de ACF possuírem alguns picos significativos, o teste formal de Ljung-Box aponta fortemente que os resíduos são independentes.
 
-Também resulta em menor EQMP
+```{r independencia_de_residuos_mod08}
 
-```{r}
-previsao_mod9 <- forecast(mod9, 12, level = 95)
-EQMP_m9 <- sum((serie_test - previsao_mod9$mean)^2)/12
-EQMP_m9
+acf(mod8$residuals, main="ACF DOS RESÍDUOS")
+pacf(mod8$residuals, main="PACF DOS RESÍDUOS")
+
+Box.test(mod8$residuals)
 ```
 
 ## Modelo de Alisamento Exponencial {#sec-alisamento}
@@ -243,7 +244,7 @@ fit_mult <- HoltWinters(serie_train, alpha = NULL, beta = NULL, gamma = NULL, se
 As constantes de suavização encontradadas são:
 
 | Constante | Modelo Aditivo                  | Modelo Multiplicativo           |
-|----------------|----------------------------|----------------------------|
+|------------------|---------------------------|---------------------------|
 | $\alpha$  | `r fit_adit$alpha %>% round(4)` | `r fit_mult$alpha %>% round(4)` |
 | $\beta$   | `r fit_adit$beta %>% round(4)`  | `r fit_mult$beta %>% round(4)`  |
 | $\gamma$  | `r fit_adit$gamma %>% round(4)` | `r fit_mult$gamma %>% round(4)` |
@@ -302,7 +303,7 @@ Além disso, a @fig-previsao-arima indica o comportamento das previsões feitas 
 #| fig-width: 9
 #| fig-height: 6
 #| 
-plot(serie_train, xlim=c(1949,1961), ylim=c(0, 600))
+plot(serie_train, xlim=c(1949,1961), ylim=c(0, 600), main="Previsão ARIMA", xlab="Tempo", ylab = "Passageiros")
 lines(previsao_arima$lower, col="red")
 lines(previsao_arima$upper, col="red")
 lines(previsao_arima$mean, col="blue")
@@ -339,6 +340,18 @@ Além disso, a @fig-previsao-alisamento indica o comportamento das previsões fe
 plot(fit_adit, previsao_adit, lwd=2, col="black", xlab="Tempo", ylab=NA)
 ```
 
+## Erro quadrático médio de previsão
+
+Para definir qual o melhor modelo comparamos o erro quadrático médio de previsão. O EQMP do modelo aditivo é 18127.55 e o do modelo SARIMA é 935.43, desse modo, o modelo que apresenta previsões mais acertivas e portanto o melhor modelo é o SARIMA, pois possui menor EQMP.
+
+```{r EQMP_SARIMA}
+
+EQMP_m8 <- sum((serie_test - previsao_arima$mean)^2)/12
+
+```
+
+$EQMP_{Aditivo} =$`r EQMP_A` \< `r EQMP_m8` $= EQMP_{Multiplicativo}$,
+
 # Conclusão
 
-Dado o discutido nesse trabalho, pelo observado das previsões obtidas na @sec-comparacao, conclui-se que o modelo que resultou nas melhores previsões e portanto entende-se ser o melhor, foi ....
+Dado o discutido nesse trabalho, pelo observado das previsões obtidas na @sec-comparacao, conclui-se que o modelo que resultou nas melhores previsões e portanto entende-se ser o melhor, foi o modelo SARIMA(2,0,1)(0,0,3)\[12\].
