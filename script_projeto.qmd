@@ -90,10 +90,11 @@ A @fig-serie indica o comportamento dos dados ao longo do tempo. Nota-se *compor
 
 ### **Estacionariedade**
 
-Os modelos ARIMA de Box e Jenkins partem do pressuposto de que a série é estacionária, desse modo, o primeiro passo para uma modelagem acertiva é verificar a estacionariedade da série. Para isso foi utilizado o teste de Dickey-Fuller, em que a hipótese nula é que os dados não são estacionários, o valor-p do teste é 0,01, ou seja, rejeitamos essa hipótese e não precisaremos tomar diferenças na série (d=0).
+Os modelos ARIMA de Box e Jenkins partem do pressuposto de que a série é estacionária, desse modo, o primeiro passo para uma modelagem acertiva é verificar a estacionariedade da série. Para isso foi utilizado o teste aumentado de Dickey-Fuller, em que a hipótese nula é que os dados não são estacionários, o valor-p do teste é 0,01, ou seja, rejeitamos essa hipótese e não precisaremos tomar diferenças na série (d=0).
 
 ```{r teste_estacionariedade}
 est_arima <- adf.test(serie_train)
+est_arima
 ```
 
 ### Identificação do modelo
@@ -191,7 +192,7 @@ mod8 <- arima(serie_train,  c(2,0,1), seasonal = c(0,0,3))
 ```
 
 |     |         Modelo         | Número de coeficientes | Porcentagem de coeficientes significativos |          AIC           |
-|:------------:|:------------:|:------------:|:---------------:|:------------:|
+|:-------------:|:-------------:|:-------------:|:-------------:|:-------------:|
 | 01  | SARIMA(1,0,0)(0,0,1)12 |           3            |                   100 %                    | `r round(mod1$aic, 3)` |
 | 02  | SARIMA(2,0,0)(0,0,1)12 |           4            |                   100 %                    | `r round(mod2$aic, 3)` |
 | 03  | SARIMA(3,0,0)(0,0,1)12 |           5            |                    80 %                    | `r round(mod3$aic, 3)` |
@@ -235,7 +236,6 @@ Além disso pode ser verificado por meio do histograma em @fig-hist-residuos e d
 hist(mod8$residuals, main="Histograma dos resíduos", xlab = "Resíduos", ylab="Frequência")
 shapiro.test(mod8$residuals)
 ```
-
 
 ## Modelo de Alisamento Exponencial {#sec-alisamento}
 
@@ -284,7 +284,7 @@ Os valores preditos usando o modelo final obtido na @sec-arima estão contidos n
 
 ```{r previsao_arima}
 #| label: tbl-previsao-arima
-#| tbl-cap: Previsão modelo SARIMA(2,0,1)(0,0,1)12
+#| tbl-cap: Previsão modelo SARIMA(2,0,1)(0,0,3)12
 
 previsao_arima <- forecast(mod8, 12, level = 95)
 
@@ -305,7 +305,7 @@ Além disso, a @fig-previsao-arima indica o comportamento das previsões feitas 
 
 ```{r grafico_prev_arima}
 #| label: fig-previsao-arima
-#| fig-cap: Valores preditos para o modelo SARIMA(2,0,1)(0,0,1)12
+#| fig-cap: Valores preditos para o modelo SARIMA(2,0,1)(0,0,3)12
 #| fig-width: 9
 #| fig-height: 6
 #| 
