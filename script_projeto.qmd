@@ -207,21 +207,7 @@ Comparando todos os modelos acima, escolhemos o melhor considerando o menor AIC 
 
 ### Análise de resíduos
 
-#### Resíduos são ruído branco
-
-Uma das suposições dos modelos de Box e Jenkins é a que os resíduos são um ruído branco, isso pode ser verificado por meio do histograma em @fig-hist-residuos e do teste formal de shapiro-wilk.
-
-```{r normalidade_residuos_mod08}
-#| label: fig-hist-residuos
-#| fig-cap: "PACF dos resíduos"
-
-hist(mod8$residuals, main="Histograma dos resíduos", xlab = "Resíduos", ylab="Frequência")
-shapiro.test(mod8$residuals)
-```
-
-#### Independência
-
-A suposição de independência dos resíduos pode ser verficada por meio dos gráficos de ACF e PACF dos resíduos, bem como o teste formal de Ljung-Box cuja hipótese nula é H0: Não há autocorrelação nos resíduos. Apesar dos gráficos de ACF possuírem alguns picos significativos, o teste formal de Ljung-Box aponta fortemente que os resíduos são independentes.
+Uma das suposições dos modelos de Box e Jenkins é a que os resíduos são um ruído branco.A suposição de independência dos resíduos pode ser verficada por meio dos gráficos de ACF e PACF dos resíduos, bem como o teste formal de Ljung-Box cuja hipótese nula é H0: Não há autocorrelação nos resíduos. Apesar dos gráficos de ACF possuírem alguns picos significativos, o teste formal de Ljung-Box aponta fortemente que os resíduos são independentes.
 
 ```{r independencia_de_residuos_mod08}
 
@@ -230,6 +216,26 @@ pacf(mod8$residuals, main="PACF DOS RESÍDUOS")
 
 Box.test(mod8$residuals)
 ```
+
+A partir do gráfico dos @fig-ind-residuos que observa *Resíduos x Tempo* para avaliar homocedasticidade. É possível notar um comportamento de maior amplitude no final da série, o que poderia ser indício de heterocedasticidade. Entretanto, como os valores estão oscilando em torno de 0 e a fim de progredir no estudo, sem perda de generalidade será tolerado esse aumento.
+
+```{r residuos_tempo}
+#| label: fig-ind-residuos
+#| fig-cap: "Gráfico para avaliar homocedastididade"
+plot(mod8$residuals, main = "Resíduos x Tempo", ylab = "Resíduos", xlab = "Tempo")
+abline(h = 0, col = "red")
+```
+
+Além disso pode ser verificado por meio do histograma em @fig-hist-residuos e do teste formal de shapiro-wilk de que há evidência de que os resíduos vieram de uma distribuição Normal. Logo, tem-se um Ruído Branco Gaussiano nesse caso.
+
+```{r normalidade_residuos_mod08}
+#| label: fig-hist-residuos
+#| fig-cap: "Normalidade dos resíduos"
+
+hist(mod8$residuals, main="Histograma dos resíduos", xlab = "Resíduos", ylab="Frequência")
+shapiro.test(mod8$residuals)
+```
+
 
 ## Modelo de Alisamento Exponencial {#sec-alisamento}
 
@@ -345,13 +351,11 @@ plot(fit_adit, previsao_adit, lwd=2, col="black", xlab="Tempo", ylab=NA)
 Para definir qual o melhor modelo comparamos o erro quadrático médio de previsão. O EQMP do modelo aditivo é 18127.55 e o do modelo SARIMA é 935.43, desse modo, o modelo que apresenta previsões mais acertivas e portanto o melhor modelo é o SARIMA, pois possui menor EQMP.
 
 ```{r EQMP_SARIMA}
-
 EQMP_m8 <- sum((serie_test - previsao_arima$mean)^2)/12
-
 ```
 
-$EQMP_{Aditivo} =$`r EQMP_A` \< `r EQMP_m8` $= EQMP_{Multiplicativo}$,
+$EQMP_{Sarima} = 935.43 < EQMP_{Aditivo} =$`r EQMP_A` \< `r EQMP_m8` $= EQMP_{Multiplicativo}$,
 
 # Conclusão
 
-Dado o discutido nesse trabalho, pelo observado das previsões obtidas na @sec-comparacao, conclui-se que o modelo que resultou nas melhores previsões e portanto entende-se ser o melhor, foi o modelo SARIMA(2,0,1)(0,0,3)\[12\].
+Dado o discutido nesse trabalho, pelo observado das previsões obtidas na @sec-comparacao, conclui-se que o modelo que resultou nas melhores previsões e portanto entende-se ser o melhor, foi o modelo $SARIMA(2,0,1)(0,0,3)_{12}$.
